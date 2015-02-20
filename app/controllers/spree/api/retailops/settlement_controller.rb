@@ -256,7 +256,7 @@ module Spree
 
             # set value
             # these might come in as strings, so coerce *before* summing
-            return_obj.amount = BigDecimal.new(info['refund_amt']) - (info['tax_amt'] ? (BigDecimal.new(info['tax_amt']) + BigDecimal.new(info['shipping_amt'])) : 0)
+            return_obj.amount = BigDecimal.new(info['refund_amt'].to_S) - (info['tax_amt'] ? (BigDecimal.new(info['tax_amt'].to_s) + BigDecimal.new(info['shipping_amt'].to_s)) : 0)
             return_obj.save!
 
             # receive it
@@ -269,8 +269,8 @@ module Spree
             # Possible issue: Setting "Refund" = No for an item will be treated the same as nulling the refund with a restocking fee
 
             if info['tax_amt']
-              shipping_amt = BigDecimal.new(info['shipping_amt'])
-              tax_amt = BigDecimal.new(info['tax_amt'])
+              shipping_amt = BigDecimal.new(info['shipping_amt'].to_s)
+              tax_amt = BigDecimal.new(info['tax_amt'].to_s)
 
               @order.adjustments.create!(amount: -shipping_amt, label: "Return #{rop_return_id} Shipping") if shipping_amt.nonzero?
               @order.adjustments.create!(amount: -tax_amt, label: "Return #{rop_return_id} Tax") if tax_amt.nonzero?
