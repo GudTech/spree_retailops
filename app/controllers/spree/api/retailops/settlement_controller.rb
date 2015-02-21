@@ -256,7 +256,7 @@ module Spree
 
             # set value
             # these might come in as strings, so coerce *before* summing
-            return_obj.amount = BigDecimal.new(info['refund_amt'].to_S) - (info['tax_amt'] ? (BigDecimal.new(info['tax_amt'].to_s) + BigDecimal.new(info['shipping_amt'].to_s)) : 0)
+            return_obj.amount = BigDecimal.new(info['refund_amt'].to_s) - (info['tax_amt'] ? (BigDecimal.new(info['tax_amt'].to_s) + BigDecimal.new(info['shipping_amt'].to_s)) : 0)
             return_obj.save!
 
             # receive it
