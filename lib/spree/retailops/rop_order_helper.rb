@@ -4,6 +4,8 @@ module Spree
       attr_accessor :order, :options
 
       def standard_shipping_label
+        # This label is recognized in Huckberry app/models/spree/order_decorator#true_ship_total
+        # If it changes need to update there.
         'Standard Shipping'
       end
 
@@ -101,7 +103,7 @@ module Spree
 
         order_ship_adj = @order.adjustments.where(label: standard_shipping_label).first
         if price > 0 && !order_ship_adj
-          @order.adjustments.create!(amount: price, label: standard_shipping_label, mandatory: false)
+          @order.adjustments.create!(order: @order, amount: price, label: standard_shipping_label, mandatory: false)
           @order.save!
           changed = true
         elsif order_ship_adj && order_ship_adj.amount != price
@@ -132,7 +134,7 @@ module Spree
         end
 
 
-        return method && method.calculator.compute(Spree::Stock::Package.new( stock_location, @order, contents ))
+        return method && method.calculator.compute(Spree::Stock::Package.new( stock_location, contents ))
       end
 
       def rop_tbd_method

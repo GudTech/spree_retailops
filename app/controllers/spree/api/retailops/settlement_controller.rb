@@ -62,14 +62,48 @@ module Spree
           render text: @settlement_results.to_json
         end
 
+        # This gets called by retailsops after a returned item has been
+        # received and accepted at the warehouse. We need to look elsehwere
+        # for hook when returned item has been received but can not be restocked.
+        #
+        # This is a local Huckberry override of this callback, originally by
+        # Dom modified by jrochkind. What spree_retailsops was doing originally
+        # is hard to tell, ALL we need to do here is create the
+        # Spree::Reimbursement, other retailops sync methods have
+        # already sync'd other data.
+        #
+        # But we want is to create one or more Spree::Reimbursement items
+        # (which is not yet a refund, more like a proposed refund),
+        # in the right amounts and other values for the transaction.
+        #
+        # We're not sure if this can be called more than once per Order
+        # by RetailsOps, maybe once per returned item?
+        #
+        # We call out to our custom ReturnHandler in Huckberry
+        # main app, easier to work with code in main app.
         def add_refund
-          ActiveRecord::Base.transaction do
-            find_order
-            assert_return params
-            @order.update!
+          if defined? ReimbursementHandler
+            reimbursement = ReimbursementHandler.from_retailops_add_refund(
+              params['settlement']
+            ).create_reimbursement
+          else
+            Bugsnag.notify(ArgumentError.new("SettlementController#add_refund can not find ReimbursementHandler class, and is using old legacy wrong logic"))
+            ActiveRecord::Base.transaction do
+              order = Order.find_by!(number: params['settlement']["order_refnum"].to_s)
+              rma = order.return_authorizations.detect { |r| r.number == params['settlement']["rma_id"].to_s }
+              spree_return = rma.customer_returns.detect {|r| r.number == params['settlement']["return_id"].to_s}
+              return_items = []
+              rma.return_items.each do |ri|
+                params["settlement"]['return_items'].to_a.each do |rops_ri|
+                  return_items << ri if ri.variant.sku == rops_ri['sku']
+                end
+              end
+              reimbursement_total = BigDecimal.new(params['settlement']["refund_amt"])
+              reibursement = Spree::Reimbursement.create(order: order, customer_return: spree_return, return_items: return_items, total: reimbursement_total)
+            end
           end
-          settle_payments_if_desired
-          render text: @settlement_results.to_json
+
+          render text: "".to_json
         end
 
         def payment_command
@@ -211,8 +245,8 @@ module Spree
             rop_return_id = info["return_id"].to_i
             rop_rma_id = info["rma_id"].to_i # may be nil->0
 
-            return_obj = @order.return_authorizations.detect { |r| r.number == "RMA-RET-#{rop_return_id}" }
-            deduct_rma_obj = @order.return_authorizations.detect { |r| r.number == "RMA-RO-#{rop_rma_id}" }
+            return_obj = @order.return_authorizations.detect { |r| r.number == "#{rop_return_id}" }
+            deduct_rma_obj = @order.return_authorizations.detect { |r| r.number == "#{rop_rma_id}" }
 
             return if return_obj # if it exists but isn't received we're in a pretty weird state because we're supposed to receive in the same txn we create
 
@@ -255,8 +289,10 @@ module Spree
 
             # create an RMA for our return
             return_obj = @order.return_authorizations.build
-            return_obj.number = "RMA-RET-#{rop_return_id}"
+            return_obj.number = "#{rop_return_id}"
             return_obj.stock_location_id = @order.shipped_shipments.first.stock_location_id # anything will be wrong since we don't want spree to restock :x
+            return_obj.reason = Spree::ReturnAuthorizationReason.where("name like '%Retail Ops%'").first || Spree::ReturnAuthorizationReason.first
+
             return_obj.save! # needs an ID before we can add stuf
 
             sloc = Spree::StockLocation.find(return_obj.stock_location_id) # "rma.stock_location" crashes.  possible has_one/has_many mixup?
@@ -285,8 +321,8 @@ module Spree
               shipping_amt = info['shipping_amt'].to_d
               tax_amt = info['tax_amt'].to_d
 
-              @order.adjustments.create!(amount: -shipping_amt, label: "Return #{rop_return_id} Shipping") if shipping_amt.nonzero?
-              @order.adjustments.create!(amount: -tax_amt, label: "Return #{rop_return_id} Tax") if tax_amt.nonzero?
+              @order.adjustments.create!(order: @order, amount: -shipping_amt, label: "Return #{rop_return_id} Shipping") if shipping_amt.nonzero?
+              @order.adjustments.create!(order: @order, amount: -tax_amt, label: "Return #{rop_return_id} Tax") if tax_amt.nonzero?
             end
           end
 
