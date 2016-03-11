@@ -258,87 +258,135 @@ module Spree
           }.to_json
         end
 
-        def sync_rma(order, rma)
+        def sync_rma(order, rma_params)
           # This is half of the RMA/return push mechanism: it handles RMAs created in RetailOps by
           # creating matching RMAs in Spree numbered RMA-ROP-NNN.  Any inventory which has been
           # returned in RetailOps will have a corresponding RetailOps return; if that exists in
           # Spree, then we *exclude* that inventory from the RMA being created and delete the RMA
           # when all items are removed.
 
-          # find Spree RMA.  bail out if received (shouldn't happen)
-          return unless order.shipped_shipments.any?  # avoid RMA create failures
-          rop_rma_str = "RMA-RO-#{rma["id"].to_i}"
-          rma_obj = order.return_authorizations.detect { |r| r.number == rop_rma_str }
-          return if rma_obj && rma_obj.received?
+          if defined?(RetailopsRmaHandler)
+            # Calls out to the parent application's custom handling for RMA data. The data
+            # is passed from ROPs to the controller in the following format, and will be passed
+            # straight through the underlying application. The application is expected to have a
+            # `RetailopsRmaHandler` class that can be initialized with a `Spree::Order` and the
+            # `Hash` below.
+            #
+            # {
+            #     "discount_amt": 0,
+            #     "id": "10067",
+            #     "items": [
+            #         {
+            #             "channel_refnum": "605775",
+            #             "order_item_id": "223845",
+            #             "quantity": "1",
+            #             "sku": "101575"
+            #         }
+            #     ],
+            #     "product_amt": 114.98,
+            #     "refund_amt": 114.98,
+            #     "returns": [
+            #         {
+            #             "discount_amt": 0,
+            #             "id": "6128",
+            #             "items": [
+            #                 {
+            #                     "channel_refnum": "605775",
+            #                     "order_item_id": "223845",
+            #                     "quantity": "1",
+            #                     "sku": "101575"
+            #                 }
+            #             ],
+            #             "product_amt": 114.98,
+            #             "refund_amt": 114.98,
+            #             "shipping_amt": 0,
+            #             "subtotal_amt": 114.98,
+            #             "tax_amt": 0
+            #         }
+            #     ],
+            #     "shipping_amt": 0,
+            #     "subtotal_amt": 114.98,
+            #     "tax_amt": 0
+            # }
+            #
+            RetailopsRmaHandler.new(order, rma_params).call
+          else
+            # find Spree RMA.  bail out if received (shouldn't happen)
+            return unless order.shipped_shipments.any?  # avoid RMA create failures
+            rop_rma_str = "RMA-RO-#{rma["id"].to_i}"
+            rma_obj = order.return_authorizations.detect { |r| r.number == rop_rma_str }
+            return if rma_obj && rma_obj.received?
 
-          # for each ROP return: check if it exists in Spree.  Reduce RMA amount for returns that
-          # have been filed.
+            # for each ROP return: check if it exists in Spree.  Reduce RMA amount for returns that
+            # have been filed.
 
-          closed_value = 0.to_d
-          closed_items = {}
+            closed_value = 0.to_d
+            closed_items = {}
 
-          rma["returns"].to_a.each do |ret|
-            ret_str = "RMA-RET-#{ret["id"].to_i}"
-            ret_obj = order.return_authorizations.detect { |r| r.number == ret_str }
+            rma["returns"].to_a.each do |ret|
+              ret_str = "RMA-RET-#{ret["id"].to_i}"
+              ret_obj = order.return_authorizations.detect { |r| r.number == ret_str }
 
-            if ret_obj && ret_obj.received?
-              closed_value += ret['refund_amt'].to_d - (ret['tax_amt'] ? (ret['tax_amt'].to_d + ret['shipping_amt'].to_d) : 0)
-              ret["items"].to_a.each do |it|
-                it_obj = order.line_items.detect { |i| i.id.to_s == it["channel_refnum"].to_s }
-                closed_items[it_obj] = (closed_items[it_obj] || 0) + it["quantity"].to_i if it_obj
+              if ret_obj && ret_obj.received?
+                closed_value += ret['refund_amt'].to_d - (ret['tax_amt'] ? (ret['tax_amt'].to_d + ret['shipping_amt'].to_d) : 0)
+                ret["items"].to_a.each do |it|
+                  it_obj = order.line_items.detect { |i| i.id.to_s == it["channel_refnum"].to_s }
+                  closed_items[it_obj] = (closed_items[it_obj] || 0) + it["quantity"].to_i if it_obj
+                end
               end
             end
-          end
 
-          use_items = {}
-          use_total = 0
+            use_items = {}
+            use_total = 0
 
-          rma["items"].to_a.each do |it|
-            line = order.line_items.detect { |i| i.id.to_s == it["channel_refnum"].to_s } or next
-            use_items[line] = [ 0, it["quantity"].to_i - (closed_items[line] || 0) ].max
-          end
+            rma["items"].to_a.each do |it|
+              line = order.line_items.detect { |i| i.id.to_s == it["channel_refnum"].to_s } or next
+              use_items[line] = [ 0, it["quantity"].to_i - (closed_items[line] || 0) ].max
+            end
 
-          use_items.each do |li, qty|
-            use_total += qty
-          end
+            use_items.each do |li, qty|
+              use_total += qty
+            end
 
-          # create RMA if not exists and items > 0
-          return if !rma_obj && use_total <= 0
+            # create RMA if not exists and items > 0
+            return if !rma_obj && use_total <= 0
 
-          unless rma_obj
-            rma_obj = order.return_authorizations.build
-            rma_obj.number = rop_rma_str
-            rma_obj.save! # have an ID *before* adding items
-            changed = true
-          end
-
-          # set RMA item quantities
-
-          changed = false
-
-          order.line_items.each do |li|
-            # this function is misnamed, it sets, it does not add
-            changed = true # use rma_obj.inventory_units to identify changes if it ever becomes necessary
-            rma_obj.add_variant(li.variant_id, use_items[li] || 0)
-          end
-
-          # delete RMA if all items gone
-          if use_total == 0
-            rma_obj.destroy!
-            return true
-          end
-
-          # set RMA amount
-          if rma["subtotal_amt"].present? || rma["refund_amt"].present?
-            use_value = rma['refund_amt'].to_d - (rma['tax_amt'] ? (rma['tax_amt'].to_d + rma['shipping_amt'].to_d) : 0) - closed_value
-            if use_value != rma_obj.amount
-              rma_obj.amount = use_value
+            unless rma_obj
+              rma_obj = order.return_authorizations.build
+              rma_obj.number = rop_rma_str
+              rma_obj.save! # have an ID *before* adding items
               changed = true
             end
-          end
 
-          rma_obj.save! if changed
-          return true
+            # set RMA item quantities
+
+            changed = false
+
+            order.line_items.each do |li|
+              # this function is misnamed, it sets, it does not add
+              changed = true # use rma_obj.inventory_units to identify changes if it ever becomes necessary
+              rma_obj.add_variant(li.variant_id, use_items[li] || 0)
+            end
+
+            # delete RMA if all items gone
+            if use_total == 0
+              rma_obj.destroy!
+              return true
+            end
+
+            # set RMA amount
+            if rma["subtotal_amt"].present? || rma["refund_amt"].present?
+              use_value = rma['refund_amt'].to_d - (rma['tax_amt'] ? (rma['tax_amt'].to_d + rma['shipping_amt'].to_d) : 0) - closed_value
+              if use_value != rma_obj.amount
+                rma_obj.amount = use_value
+                changed = true
+              end
+            end
+
+            rma_obj.save! if changed
+
+            true
+          end
         end
 
         private
