@@ -6,6 +6,7 @@ require 'bundler/setup'
 
 require File.expand_path('../dummy/config/environment.rb',  __FILE__)
 
+require 'byebug'
 require 'spree_retailops'
 
 require 'rspec/rails'
@@ -46,6 +47,10 @@ RSpec.configure do |config|
   # config.mock_with :rr
   config.mock_with :rspec
   config.color = true
+
+  config.render_views = true
+
+  config.infer_spec_type_from_file_location!
 
   # Capybara javascript drivers require transactional fixtures set to false, and we use DatabaseCleaner
   # to cleanup after each test instead.  Without transactional fixtures set to false the records created
