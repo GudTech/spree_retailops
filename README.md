@@ -49,3 +49,9 @@ This is also called when updating orders, with `total_shipping_amt` set to the t
 * `Spree::LineItem#retailops_expected_ship_date`: Define this to automatically populate the RetailOps "expected ship date" field on order line items, allowing for customer expectation-based routing decisions.
 
 Copyright (c) 2014 Gud Technologies, Inc, released under the New BSD License
+
+Tests
+-----
+
+When developing the `spree_retailops` gem, you should use `bin/rake` to run the tests. This will create
+any files needed to run the tests prior to running the test command.
