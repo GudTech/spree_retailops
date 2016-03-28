@@ -95,7 +95,7 @@ module Spree
               shipment.save!
             end
 
-            li = order.contents.add(variant, qty - oldqty, nil, shipment)
+            li = order.contents.add(variant, qty - oldqty, shipment: shipment)
           elsif qty < oldqty
             mark_changed!
             li = order.contents.remove(variant, oldqty - qty)

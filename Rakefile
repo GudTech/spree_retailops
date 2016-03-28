@@ -12,14 +12,6 @@ task :default do
     Dir.chdir("../../")
   end
 
-  gem_root = File.dirname(__FILE__)
-  devise_initializer_path = Pathname.new(gem_root).join("spec/dummy/config/initializers/devise.rb")
-  if !File.exist?(devise_initializer_path)
-    File.open(devise_initializer_path, "w") do |f|
-      f.puts "Devise.secret_key = '#{SecureRandom.hex(32)}'"
-    end
-  end
-
   Rake::Task[:spec].invoke
 end
 
