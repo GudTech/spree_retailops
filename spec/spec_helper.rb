@@ -29,6 +29,8 @@ require 'spree/testing_support/controller_requests'
 require 'spree/testing_support/authorization_helpers'
 require 'spree/testing_support/url_helpers'
 
+require 'spree/api/testing_support/helpers'
+
 # Requires factories defined in lib/spree_retailops/factories.rb
 require 'spree_retailops/factories'
 
@@ -60,6 +62,11 @@ RSpec.configure do |config|
   # to cleanup after each test instead.  Without transactional fixtures set to false the records created
   # to setup a test will be unavailable to the browser, which runs under a separate server instance.
   config.use_transactional_fixtures = false
+
+  config.include Spree::TestingSupport::ControllerRequests, type: :controller
+  config.include Spree::TestingSupport::UrlHelpers, type: :controller
+  config.include Spree::Api::TestingSupport::Helpers, type: :controller
+  # config.include AuthenticationSupport, type: :controller
 
   # Ensure Suite is set to use transactions for speed.
   config.before :suite do
