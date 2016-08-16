@@ -1,4 +1,3 @@
-# model on https://github.com/solidusio/solidus_legacy_return_authorizations/blob/b2b8eee6dde9c8a2cf07ff083673128d2f58a0af/spec/controllers/spree/api/legacy_return_authorizations_controller_spec.rb
 require 'spec_helper'
 
 module Spree
