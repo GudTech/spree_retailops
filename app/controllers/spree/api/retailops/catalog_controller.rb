@@ -158,9 +158,9 @@ module Spree
           # and create if needed
           def upsert_product_only(pd, variant_sets)
             variant_list = pd['variants'].to_a
-            return add_error("no variants specified") if variant_list.empty?
             # in the non-varying case, copy data up
             if !pd["varies"]
+              return add_error("no variants specified") if variant_list.empty?
               v = variant_list[0]
               variant_list = []
               %w( images stock stock_detailed tax_category weight height depth width cost_price price cost_currency sku var_extend ).each do |c|

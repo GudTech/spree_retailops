@@ -134,8 +134,7 @@ EXAMPLE1
           'message' => 'Extension field prodbad (Spree::Product) not available on this instance',
         }]
 
-        var = Variant.where(sku: 'P40113').first
-        prod = var.product
+        prod = Variant.where(sku: 'P40113').first.product
 
         prod.available_on.should == Time.at(1412121600)
         prod.master.cost_price.should == '44'.to_d
@@ -183,6 +182,22 @@ EXAMPLE1
         vvar.tax_category.name.should == 'Sales and Use Tax'
         vvar.width.should == '0.3'.to_d
 
+        spree_post :catalog_push, options: {}, products_json: <<CHANGE
+[
+   {
+      "corr_id" : "11",
+      "description" : "This is also a description",
+      "sku" : "P40113",
+      "varies" : true
+   }
+]
+CHANGE
+        response.status.should == 200
+        json_response['import_results'].should == []
+
+        prod = Variant.where(sku: 'P40113').first.product
+        prod.description.should == 'This is also a description'
+        prod.property('MSRP').should == '123'
       end
     end
   end
