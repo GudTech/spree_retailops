@@ -199,6 +199,38 @@ CHANGE
         prod.description.should == 'This is also a description'
         prod.property('MSRP').should == '123'
       end
+
+      it "can minimal push with varies=false" do
+        spree_post :catalog_push, options: {}, products_json: <<EXAMPLE2
+[
+   {
+      "corr_id" : "11",
+      "sku" : "P40114",
+      "slug" : "40114-sluggy",
+      "name" : "sample name",
+      "ship_category" : "Test shipping",
+      "variants" : [
+         {
+            "corr_id" : "22",
+            "sku" : "123655",
+            "price" : "11.11"
+         }
+      ],
+      "varies" : false
+   }
+]
+EXAMPLE2
+        response.status.should == 200
+        json_response['import_results'].should == []
+
+        prod = Variant.where(sku: '123655').first.product
+        prod.name.should == "sample name"
+        prod.shipping_category.name.should == "Test shipping"
+
+        prod.variants.count.should == 0
+        prod.master.sku.should == '123655'
+      end
+
     end
   end
 end
