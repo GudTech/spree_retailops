@@ -24,13 +24,15 @@ module Spree
       end
 
       it "can test 1" do
+        expect_any_instance_of(Product).to receive(:retailops_extend_prodgood=).with('55')
+        expect_any_instance_of(Variant).to receive(:retailops_extend_vargood=).with('77')
         spree_post :catalog_push, options: {}, products_json: <<EXAMPLE1
 [
    {
       "available_on" : 1412121600,
-      "corr_id" : "1",
-      "cost_currency" : "",
-      "cost_price" : 0,
+      "corr_id" : "11",
+      "cost_currency" : "USD",
+      "cost_price" : 44,
       "description" : "This is a description",
       "images" : [
          {
@@ -55,7 +57,6 @@ module Spree
          "Color",
          "Size"
       ],
-      "permalink" : "40113-sluggy",
       "price" : 87.65,
       "prod_extend" : {
          "prodgood": "55",
@@ -86,8 +87,8 @@ module Spree
          {
             "corr_id" : "2",
             "cost_price" : 1,
-            "depth" : 0,
-            "height" : 0,
+            "depth" : 0.1,
+            "height" : 0.2,
             "images" : [],
             "options" : [
                {
@@ -117,23 +118,71 @@ module Spree
             },
             "tax_category" : "Sales and Use Tax",
             "var_extend" : {
+                "vargood" : "77"
             },
-            "weight" : 0.5,
-            "width" : 0
+            "weight" : "0.5",
+            "width" : 0.3
          }
       ],
       "varies" : true
    }
 ]
 EXAMPLE1
-        #foo
         response.status.should == 200
-        puts(JSON.pretty_generate(json_response['import_results']))
-        v = Variant.where(sku: 'P40113').first
-        prod = v.product
+        json_response['import_results'].should == [{
+          'corr_id' => '11',
+          'message' => 'Extension field prodbad (Spree::Product) not available on this instance',
+        }]
+
+        var = Variant.where(sku: 'P40113').first
+        prod = var.product
+
+        prod.available_on.should == Time.at(1412121600)
+        prod.master.cost_price.should == '44'.to_d
+        prod.master.cost_currency.should == 'USD'
         prod.description.should == 'This is a description'
-        prod.slug.should == '40113-sluggy'
+
+        prod.images.count.should == 2
+        prod.images.first.position.should == 1
+        prod.images.first.alt.should == 'alt text 1'
+        prod.images.first.attachment_file_name.should == 'img_1.jpg'
+        prod.images.first.attachment_file_size.should == 1058
+        prod.images.second.position.should == 2
+        prod.images.second.alt.should == 'alt text 2'
+        prod.images.second.attachment_file_name.should == 'img_2.jpg'
+        prod.images.second.attachment_file_size.should == 4025
+
         prod.meta_description.should == '(Meta description)'
+        prod.meta_keywords.should == ''
+        prod.name.should == 'product name'
+        prod.option_types.pluck(:name).to_set.should == [ 'Color', 'Size' ].to_set
+        prod.master.price.should == '87.65'.to_d
+        # extends handled by the mock above ...
+        prod.property('MSRP').should == '123'
+        prod.property('Oversized').should == 'No'
+        prod.shipping_category.name.should == 'Domestic and International'
+        prod.master.sku.should == 'P40113' # redundant given search, but
+        prod.slug.should == '40113-sluggy'
+        prod.tax_category.name.should == 'Sales and Use Tax'
+        prod.taxons.to_a.map(&:pretty_name).to_set.should == ['Length -> Long'].to_set
+
+        prod.variants.size.should == 1
+        vvar = prod.variants.first
+        vvar.cost_price.should == '1'.to_d
+        vvar.depth.should == '0.1'.to_d
+        vvar.height.should == '0.2'.to_d
+
+        vvar.images.count.should == 0
+
+        vvar.option_values.size.should == 2
+        vvar.option_value('Color').should == 'Medium'
+        vvar.option_value('Size').should == '29'
+        vvar.price.should == '98.89'.to_d
+        vvar.sku.should == '123654'
+        vvar.stock_items.sum(:count_on_hand).should == 5
+        vvar.tax_category.name.should == 'Sales and Use Tax'
+        vvar.width.should == '0.3'.to_d
+
       end
     end
   end
