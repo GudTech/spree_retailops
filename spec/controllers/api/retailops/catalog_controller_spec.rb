@@ -15,7 +15,7 @@ module Spree
     end
 
     context "as an admin" do
-      before { allow(current_api_user).to receive(:has_spree_role?) { true } }
+      sign_in_as_admin!
 
       it "can do a no-op empty import" do
         spree_post :catalog_push, products: [], format: :json

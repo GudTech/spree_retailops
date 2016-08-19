@@ -19,7 +19,8 @@ module Spree
     end
 
     context "as an admin" do
-      before { allow(current_api_user).to receive(:has_spree_role?) { true } }
+      # before { allow(current_api_user).to receive(:has_spree_role?) { true } }
+      sign_in_as_admin!
 
       it "can set import state if not done" do
         order = create(:order)

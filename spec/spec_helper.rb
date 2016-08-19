@@ -26,6 +26,7 @@ require 'spree/testing_support/authorization_helpers'
 require 'spree/testing_support/url_helpers'
 
 require 'spree/api/testing_support/helpers'
+require 'spree/api/testing_support/setup'
 
 # Requires factories defined in lib/spree_retailops/factories.rb
 require 'spree_retailops/factories'
@@ -63,6 +64,7 @@ RSpec.configure do |config|
   config.include Spree::TestingSupport::ControllerRequests, type: :controller
   config.include Spree::TestingSupport::UrlHelpers, type: :controller
   config.include Spree::Api::TestingSupport::Helpers, type: :controller
+  config.extend Spree::Api::TestingSupport::Setup, :type => :controller
   # config.include AuthenticationSupport, type: :controller
 
   # Ensure Suite is set to use transactions for speed.
