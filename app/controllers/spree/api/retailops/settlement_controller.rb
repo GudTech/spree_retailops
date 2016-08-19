@@ -62,14 +62,30 @@ module Spree
           render text: @settlement_results.to_json
         end
 
+        # This gets called by RetailOps after a returned item has been
+        # received and accepted at the warehouse. We need to look elsehwere
+        # for hook when returned item has been received but can not be restocked.
+        #
+        # We first look for a `RetailopsReimbursementHandler` class to see if the host
+        # application has defined any custom logic. If they have, we simply
+        # pass the parameters to the defined `Reimbursement.from_retailops_add_refund`
+        # factory method and call `RetailopsReimbursementHandler#create_reimbursement`.
         def add_refund
-          ActiveRecord::Base.transaction do
-            find_order
-            assert_return params
-            @order.update!
+          if defined?(RetailopsReimbursementHandler)
+            reimbursement = RetailopsReimbursementHandler.from_retailops_add_refund(
+              params['settlement']
+            ).create_reimbursement
+
+            render text: "".to_json
+          else
+            ActiveRecord::Base.transaction do
+              find_order
+              assert_return params
+              @order.update!
+              settle_payments_if_desired
+              render text: @settlement_results.to_json
+            end
           end
-          settle_payments_if_desired
-          render text: @settlement_results.to_json
         end
 
         def payment_command
