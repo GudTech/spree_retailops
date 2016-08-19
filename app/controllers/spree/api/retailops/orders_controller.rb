@@ -259,31 +259,6 @@ module Spree
         end
 
         def sync_rma(order, rma)
-          # The RMA / return flow was drastically changed in Spree 2.4
-          if defined? Spree::Reimbursement
-            sync_rma_24(order, rma)
-          else
-            sync_rma_23(order, rma)
-          end
-        end
-
-        def sync_rma_24(order, rma)
-          # Spree 2.4 handles returns and RMAs much closer to the RetailOps model, in particular the
-          # separation between returns and RMAs.  Note that RetailOps does not have a split between
-          # returns and reimbursements; when you return product in RO, the reimbursement is performed
-          # automatically.
-
-          return unless order.shipped_shipments.any?  # avoid RMA create failures
-          rop_rma_str = "RMA-RO-#{rma["id"].to_i}"
-          rma_obj = order.return_authorizations.detect { |r| r.number == rop_rma_str }
-
-          # A Spree RMA is for a specific reason to a specific place, so we need to split up ROP RMAs
-          # by reason code...
-          
-
-        end
-
-        def sync_rma_23(order, rma)
           # This is half of the RMA/return push mechanism: it handles RMAs created in RetailOps by
           # creating matching RMAs in Spree numbered RMA-ROP-NNN.  Any inventory which has been
           # returned in RetailOps will have a corresponding RetailOps return; if that exists in
