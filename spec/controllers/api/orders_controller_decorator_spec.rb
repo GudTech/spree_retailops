@@ -19,7 +19,7 @@ module Spree
     end
 
     context "as an admin" do
-      before { current_api_user.stub has_spree_role?: true }
+      before { allow(current_api_user).to receive(:has_spree_role?) { true } }
 
       it "can set import state if not done" do
         order = create(:order)
