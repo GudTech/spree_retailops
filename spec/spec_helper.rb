@@ -10,6 +10,7 @@ require 'byebug'
 require 'spree_retailops'
 
 require 'rspec/rails'
+require 'rspec/active_model/mocks'
 require 'factory_girl'
 require 'database_cleaner'
 require 'ffaker'

@@ -212,7 +212,7 @@ module Spree
           }.to_json
         end
 
-        def sync_rma(order, rma_params)
+        def sync_rma(order, rma)
           # This is half of the RMA/return push mechanism: it handles RMAs created in RetailOps by
           # creating matching RMAs in Spree numbered RMA-ROP-NNN.  Any inventory which has been
           # returned in RetailOps will have a corresponding RetailOps return; if that exists in
@@ -263,7 +263,7 @@ module Spree
             #     "tax_amt": 0
             # }
             #
-            RetailopsRmaHandler.new(order, rma_params).call
+            RetailopsRmaHandler.new(order, rma).call
           else
             # find Spree RMA.  bail out if received (shouldn't happen)
             return unless order.shipped_shipments.any?  # avoid RMA create failures
