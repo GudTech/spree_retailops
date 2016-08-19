@@ -231,6 +231,110 @@ EXAMPLE2
         prod.master.sku.should == '123655'
       end
 
+      it "supports image update" do
+        ############## CREATE A BASIC PRODUCT
+        spree_post :catalog_push, options: {}, products_json: <<EXAMPLE3
+[
+   {
+      "corr_id" : "11",
+      "sku" : "555",
+      "price" : "11.11",
+      "slug" : "555-xyz",
+      "name" : "sample name",
+      "ship_category" : "Test shipping",
+      "varies" : true
+   }
+]
+EXAMPLE3
+        response.status.should == 200
+        json_response['import_results'].should == []
+
+        ############## ADD IMAGES
+        spree_post :catalog_push, options: {}, products_json: <<EXAMPLE3
+[
+   {
+      "corr_id" : "11",
+      "sku" : "555",
+      "images" : [
+         {
+            "alt_text" : "alt 1",
+            "filename" : "img_1.jpg",
+            "url" : "https://media.gudtech.com/media/ZBzxWOGd1gGUrzYS8IJPfNGjinDUs3Lq-7.jpg"
+         },
+         {
+            "alt_text" : "alt 2",
+            "filename" : "img_2.jpg",
+            "url" : "https://media.gudtech.com/media/rF2A6lO2edsvvA7DUDPtEt8y9pUa7VYX-7.jpg"
+         }
+      ],
+      "varies" : true
+   }
+]
+EXAMPLE3
+        response.status.should == 200
+        json_response['import_results'].should == []
+
+        prod = Variant.where(sku: '555').first.product
+        prod.master.images.pluck(:attachment_file_name).should == ['img_1.jpg', 'img_2.jpg']
+        prod.master.images.pluck(:position).should == [1,2]
+        first_udate = prod.master.images.first.attachment_updated_at
+
+        ############## REORDER IMAGES
+        spree_post :catalog_push, options: {}, products_json: <<EXAMPLE3
+[
+   {
+      "corr_id" : "11",
+      "sku" : "555",
+      "images" : [
+          {
+              "alt_text" : "alt 2",
+              "filename" : "img_2.jpg",
+              "url" : "https://media.gudtech.com/media/rF2A6lO2edsvvA7DUDPtEt8y9pUa7VYX-7.jpg"
+          },
+          {
+              "alt_text" : "alt 1",
+              "filename" : "img_1.jpg",
+              "url" : "https://media.gudtech.com/media/ZBzxWOGd1gGUrzYS8IJPfNGjinDUs3Lq-7.jpg"
+          }
+      ],
+      "varies" : true
+   }
+]
+EXAMPLE3
+        response.status.should == 200
+        json_response['import_results'].should == []
+
+        prod = Variant.where(sku: '555').first.product
+        prod.master.images.pluck(:attachment_file_name).should == ['img_2.jpg', 'img_1.jpg']
+        prod.master.images.pluck(:position).should == [1,2]
+        first_udate.should == prod.master.images.second.attachment_updated_at
+
+        ############## DELETE AN IMAGE
+        spree_post :catalog_push, options: {}, products_json: <<EXAMPLE3
+[
+   {
+      "corr_id" : "11",
+      "sku" : "555",
+      "images" : [
+          {
+              "alt_text" : "alt 1",
+              "filename" : "img_1.jpg",
+              "url" : "https://media.gudtech.com/media/ZBzxWOGd1gGUrzYS8IJPfNGjinDUs3Lq-7.jpg"
+          }
+      ],
+      "varies" : true
+   }
+]
+EXAMPLE3
+        response.status.should == 200
+        json_response['import_results'].should == []
+
+        prod = Variant.where(sku: '555').first.product
+        prod.master.images.pluck(:attachment_file_name).should == ['img_1.jpg']
+        prod.master.images.pluck(:position).should == [1]
+        first_udate.should == prod.master.images.first.attachment_updated_at
+      end
+
     end
   end
 end
