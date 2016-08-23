@@ -1,6 +1,54 @@
 require 'spec_helper'
 
 describe Spree::Api::Retailops::OrdersController do
+  render_views
+  before do
+    stub_authentication!
+  end
+
+  context "as a random user" do
+    it "cannot export orders" do
+      spree_xhr_post :index
+      assert_unauthorized!
+    end
+
+    it "cannot mark orders imported" do
+      spree_xhr_post :export, ids: []
+      assert_unauthorized!
+    end
+  end
+
+  context "signed in as admin" do
+    sign_in_as_admin!
+
+    it "fetch no orders" do
+      order = create(:order, retailops_import: 'no')
+      spree_xhr_post :index
+      expect(json_response).to eq([])
+    end
+
+    it "fetch one order" do
+      order = create(:order_ready_to_ship, retailops_import: 'yes')
+      spree_xhr_post :index
+      expect(json_response.size).to eq(1)
+      dto = json_response[0]
+      expect(dto['total'].to_d).to eq(order.total)
+      expect(dto['line_items'].size).to eq(order.line_items.size)
+      expect(dto['line_items'][0]['sku']).to eq(order.line_items.first.variant.sku)
+    end
+
+    it "can mark orders imported" do
+      order = create(:order, retailops_import: 'yes')
+      spree_xhr_post :export, ids: [order.id]
+      expect(response.status).to eq(200)
+      order.reload
+      expect(order.retailops_import).to eq('done')
+    end
+  end
+end
+
+describe Spree::Api::Retailops::OrdersController do
+  # Synchronize tests
   let(:params) do
     {
       "order_amts" => {

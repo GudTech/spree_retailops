@@ -94,7 +94,7 @@ module Spree
         end
 
         def export
-          authorize! :update, Order
+          authorize! :manage, Order
           ids = params["ids"]
           raise "ids must be a list of numbers" unless ids.is_a?(Array) && ids.all? { |i| i.is_a? Fixnum }
 
