@@ -140,7 +140,7 @@ module Spree
         # }
         #
         def synchronize
-          authorize! :update, Order
+          authorize! :manage, Order
           changed = false
           result = []
           order = Order.find_by!(number: params["order_refnum"].to_s)

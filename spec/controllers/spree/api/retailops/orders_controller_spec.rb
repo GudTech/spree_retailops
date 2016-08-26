@@ -16,6 +16,12 @@ describe Spree::Api::Retailops::OrdersController do
       spree_xhr_post :export, ids: []
       assert_unauthorized!
     end
+
+    it "cannot push updates to orders" do
+      o = create(:order_ready_to_ship)
+      spree_xhr_post :synchronize, order_refnum: o.number
+      assert_unauthorized!
+    end
   end
 
   context "signed in as admin" do
@@ -43,6 +49,56 @@ describe Spree::Api::Retailops::OrdersController do
       expect(response.status).to eq(200)
       order.reload
       expect(order.retailops_import).to eq('done')
+    end
+
+    it "can no-op synchronize" do
+      o = create(:order_ready_to_ship)
+      spree_xhr_post :synchronize, order_refnum: o.number
+      expect(response.status).to eq(200)
+      expect(json_response['result'].size).to eq(0)
+      expect(json_response['changed']).to eq(false)
+      expect(json_response['dump']['number']).to eq(o.number)
+    end
+
+    it "can update a line in synchronize" do
+      o = create(:order_ready_to_ship)
+      li = o.line_items.first
+      spree_xhr_post :synchronize, {
+        "line_items"   => [
+          {
+            "apportioned_ship_amt"    => 11.95,
+            "corr"                    => "1014401",
+            "direct_ship_amt"         => 0,
+            "estimated_cost"          => 18.38,
+            "estimated_extended_cost" => "18.38",
+            "estimated_ship_date"     => 1473815974,
+            "estimated_unit_cost"     => 18.38,
+            "quantity"                => "1",
+            "refnum"                  => li.id,
+            "removed"                 => nil,
+            "sku"                     => li.variant.sku,
+            "unit_price"              => 51
+          }
+        ],
+        "options"      => {
+          "ok_capture" => "true"
+        },
+        "order_amts"   => {
+          "direct_tax_amt" => 0,
+          "discount_amt"   => 0,
+          "shipping_amt"   => 11.95,
+          "tax_amt"        => 0
+        },
+        "order_refnum" => o.number,
+        "rmas"         => []
+      }
+      expect(json_response['changed']).to eq(true)
+      expect(json_response['result'].size).to eq(1)
+      expect(json_response['result'][0]['corr']).to eq('1014401')
+      expect(json_response['result'][0]['refnum']).to eq(li.id)
+      li.reload
+      expect(li.price).to eq(51.to_d)
+      expect(li.cost_price).to eq('18.38'.to_d)
     end
   end
 end
