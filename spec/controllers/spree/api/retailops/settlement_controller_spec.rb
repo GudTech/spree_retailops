@@ -114,7 +114,48 @@ describe Spree::Api::Retailops::SettlementController do
       expect(o.shipments.ready.count).to eq(1)
     end
 
-    it "can call custom #retailops_set_tracking"
+    it "can call custom #retailops_set_tracking" do
+      bypass_rescue
+      o = create(:order_ready_to_ship)
+      o.shipments.first.inventory_units.each{ |iu| iu.order_id = o.id; iu.save! } # possibly a bug in the factory
+      l1 = o.line_items.first
+
+      expect_any_instance_of(Spree::Shipment).to receive(:retailops_set_tracking) do |ship, pkg|
+        expect(pkg['from']).to eq('a location')
+        ship.tracking = '1234'
+        ship.shipping_rates.delete_all
+        ship.cost = 0.to_d
+        mm = Spree::ShippingMethod.create!(name: 'abc', admin_name: 'def') do |m|
+          m.calculator = Spree::Calculator::Shipping::RetailopsAdvisory.new
+          m.shipping_categories << Spree::ShippingCategory.first
+        end
+
+        ship.add_shipping_method(mm, true)
+      end
+
+      spree_xhr_post :add_packages, {
+        "options"      => {},
+        "order_refnum" => o.number,
+        "packages"     => [
+          {
+            "contents" => [
+              {
+                "id"       => l1.id,
+                "quantity" => 1
+              }
+            ],
+            "date"     => "2016-08-27T00:22:57Z",
+            "from"     => "a location",
+            "id"       => "584498",
+            "shipcode" => "FedEx Ground",
+            "tracking" => "846085121745341"
+          }
+        ]
+      }
+      p response.body
+      expect(response.status).to eq(200)
+    end
+
     it "can mark orders completely shipped"
     it "can trigger payment refunds"
     it "can issue order refunds"
