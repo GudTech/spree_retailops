@@ -115,6 +115,7 @@ module Spree
 
           # What order is being settled?
           def find_order
+            authorize! :manage, Order
             @order = Order.find_by!(number: params["order_refnum"].to_s)
             authorize! :update, @order
 
