@@ -165,9 +165,20 @@ describe Spree::Api::Retailops::SettlementController do
       spree_xhr_post :add_refund, {
         "order_refnum" => o.number
       }
+      expect(response.status).to eq(200)
     end
 
-    it "can perform payment commands"
-    it "can cancel orders"
+    # payment_command is not used
+
+    it "can cancel orders" do
+      o = create(:order_ready_to_ship)
+      spree_xhr_post :cancel, {
+        "order_refnum" => o.number
+      }
+      expect(response.status).to eq(200)
+
+      o.reload
+      expect(o).to be_canceled
+    end
   end
 end
