@@ -115,10 +115,58 @@ describe Spree::Api::Retailops::SettlementController do
       expect(response.status).to eq(200)
     end
 
-    it "can mark orders completely shipped"
-    it "can trigger payment refunds"
-    it "can issue order refunds"
-    it "can call custom reimbursement handler"
+    it "can mark orders completely shipped" do
+      o = create(:order_ready_to_ship, line_items_count: 1)
+      o.shipments.first.inventory_units.each{ |iu| iu.order_id = o.id; iu.save! } # possibly a bug in the factory
+
+      spree_xhr_post :add_packages, {
+        "options"      => {},
+        "order_refnum" => o.number,
+        "packages"     => [
+          {
+            "contents" => [
+              {
+                "id"       => o.line_items.first.id,
+                "quantity" => 1
+              }
+            ],
+            "date"     => "2016-08-27T00:22:57Z",
+            "from"     => "a location",
+            "id"       => "584498",
+            "shipcode" => "FedEx Ground",
+            "tracking" => "846085121745341"
+          }
+        ]
+      }
+      expect(response.status).to eq(200)
+
+      spree_xhr_post :mark_complete, {
+        "options"      => {
+          "ok_capture" => "true"
+        },
+        "order_refnum" => o.number,
+        "refund_items" => []
+      }
+      expect(response.status).to eq(200)
+
+      # mark_complete doesn't actually do much without refund handling, which we're explicitly punting (2016-08-29)
+    end
+
+    # it "can trigger payment refunds"
+    # it "can issue order refunds"
+    it "can call custom reimbursement handler" do
+      o = create(:order_ready_to_ship)
+      stub_const("RetailopsReimbursementHandler", Class.new)
+      expect(RetailopsReimbursementHandler).to receive(:from_retailops_add_refund).and_return(Class.new do
+        def create_reimbursement()
+        end
+      end.new)
+
+      spree_xhr_post :add_refund, {
+        "order_refnum" => o.number
+      }
+    end
+
     it "can perform payment commands"
     it "can cancel orders"
   end
