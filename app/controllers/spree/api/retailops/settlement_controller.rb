@@ -76,7 +76,7 @@ module Spree
               params['settlement']
             ).create_reimbursement
 
-            render text: "".to_json
+            render text: {}.to_json
           else
             ActiveRecord::Base.transaction do
               find_order
