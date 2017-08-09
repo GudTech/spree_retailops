@@ -40,13 +40,15 @@ I'm a hard-liner about namespace pollution, so all global names created or inter
 
 * `Spree::Order#retailops_set_shipping_amt(total_shipping_amt: total, order_shipping_amt: order_level)`: Define this to override the default behavior of shipping amounts pushed from RetailOps, which is to convert all shipping costs into a `Standard Shipping` adjustment and then adjust that.  Both arguments are `BigDecimal`; `total_shipping_amt` is the shipping total from RetailOps, while `order_shipping_amt` excludes shipping amounts on line items (use this if you plan to handle line-item shipping separately).  More keyword arguments may be added in the future. _This method, and the subsequent four through `retailops_extension_writeback`, are expected to return a true value if changes were made.  This is intended to avoid redundant `save!` calls, but it is safe to always return true._
 
-This is also called when updating orders, with `total_shipping_amt` set to the total calculated through the shipping method and `order_shipping_amt` to nil.
+  This is also called when updating orders, with `total_shipping_amt` set to the total calculated through the shipping method and `order_shipping_amt` to nil.
 
 * `Spree::Order#retailops_after_writeback(hash)`: Define this to perform arbitrary processing after a writeback cycle.  The argument is the raw RetailOps order data transfer object, whose format is not yet fully stabilized.
 
 * `Spree::LineItem#retailops_extension_writeback(hash)`: Define this to accept per-line-item data which is not handled by stock Spree.  Two hash keys are currently defined, `direct_ship_amt` which is a BigDecimal shipping amount for the specific line item (not including order-wide shipping charges), and `apportioned_ship_amt` which is that line item's share of the order shipping (as would be used for refunds).
 
 * `Spree::LineItem#retailops_expected_ship_date`: Define this to automatically populate the RetailOps "expected ship date" field on order line items, allowing for customer expectation-based routing decisions.
+
+* `Spree::LineItem#retailops_expected_arrival_date`: Define this to automatically populate the RetailOps "expected arrival date" field on order line items, allowing for customer expectation-based routing decisions.
 
 * `RetailopsLineItemUpdateHandler`: Define this class that is initialized with a Spree::Order and line item hash to define custom behavior when new line item data is synchronized from RetailOps. The default implementation and documentation for the API you must implement is in `Spree::Retailops::RopLineItemUpdater`.
 
